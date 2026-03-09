@@ -17,10 +17,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-html{height:100%;overflow:hidden;}
-body{height:100%;background:#0f0f12;color:#fff;font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
-#app{max-width:480px;margin:0 auto;position:relative;height:100%;display:flex;flex-direction:column;}
-.view-area{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:12px;}
+html,body{height:100%;background:#0f0f12;color:#fff;font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}
+body{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+#app{max-width:480px;margin:0 auto;position:relative;min-height:100vh;padding-bottom:80px;}
 input::placeholder{color:rgba(255,255,255,0.2);}
 input:focus{border-color:rgba(232,200,114,0.3)!important;outline:none;}
 ::-webkit-scrollbar{width:3px;}
@@ -31,7 +30,7 @@ input:focus{border-color:rgba(232,200,114,0.3)!important;outline:none;}
 @keyframes slideUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
 
 /* Tab Bar */
-.tab-bar{background:rgba(15,15,18,0.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));flex-shrink:0;}
+.tab-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(15,15,18,0.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));z-index:100;}
 .tab-bar button{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(255,255,255,0.3);transition:color 0.2s;padding:4px 18px;-webkit-tap-highlight-color:transparent;}
 .tab-bar button.active{color:#e8c872;}
 .tab-bar button .icon{font-size:20px;line-height:1;}
@@ -230,6 +229,8 @@ const db = {
 const AD_CLIENT = "ca-pub-XXXXXXXXXXXXXXXX"; // AdSense 게시자 ID
 const AD_SLOT   = "XXXXXXXXXX";             // 광고 단위 ID
 // ═══════════════════════════════════════════════
+
+const ADS_CONFIGURED = !AD_CLIENT.includes("XXXX") && !AD_SLOT.includes("XXXX");
 
 function adSlot(format="auto") {
   return `<div class="ad-wrap">
@@ -472,7 +473,7 @@ function statsView(){
 }
 
 // ─── Actions ───
-function setTab(t){S.tab=t;render();document.querySelector('.view-area')?.scrollTo(0,0);}
+function setTab(t){S.tab=t;render();window.scrollTo(0,0);}
 function setF(k,v){S.form[k]=v;if(k==="type")S.form.cat=v==="income"?"salary":"food";render();}
 function setFS(k,v){S.form[k]=v;}
 function handleAmt(el){const r=el.value.replace(/[^0-9]/g,"");S.form.amount=r?parseInt(r).toLocaleString():"";el.value=S.form.amount;}
@@ -517,7 +518,7 @@ function render(){
     case"list":view=listView();break;
     case"stats":view=statsView();break;
   }
-  document.getElementById("app").innerHTML=`<div class="view-area">${view}</div>${tb}`;
+  document.getElementById("app").innerHTML=`${view}${tb}`;
   setTimeout(pushAds, 100);
 }
 
