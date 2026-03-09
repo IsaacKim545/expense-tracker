@@ -11,7 +11,6 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>가계부</title>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -572,10 +571,12 @@ var db = {
 // ════════════════════════════════════════
 // ★ 아래 두 값을 본인의 ID로 교체하세요 ★
 // ★ 상단 <script> 태그의 ca-pub-XXXX도 같이 교체 ★
-var AD_CLIENT = "ca-pub-XXXXXXXXXXXXXXXX";
+var AD_CLIENT = "ca-pub-9141453275201823";
 var AD_SLOT = "XXXXXXXXXX";
 
 function adSlot() {
+  // AdSense ID가 설정되지 않으면 빈 문자열 반환 (공간 차지 안 함)
+  if (AD_CLIENT.indexOf("XXXX") !== -1 || AD_SLOT.indexOf("XXXX") !== -1) return "";
   return '<div class="ad-wrap">' +
     '<div class="ad-label">AD</div>' +
     '<ins class="adsbygoogle" style="display:block"' +
@@ -586,7 +587,22 @@ function adSlot() {
     '</div>';
 }
 
+// AdSense 스크립트는 ID가 설정됐을 때만 로드
+var adsLoaded = false;
+function loadAdsScript() {
+  if (adsLoaded) return;
+  if (AD_CLIENT.indexOf("XXXX") !== -1) return;
+  var s = document.createElement("script");
+  s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + AD_CLIENT;
+  s.async = true;
+  s.crossOrigin = "anonymous";
+  document.head.appendChild(s);
+  adsLoaded = true;
+}
+
 function pushAds() {
+  if (AD_CLIENT.indexOf("XXXX") !== -1) return;
+  loadAdsScript();
   try {
     var els = document.querySelectorAll(".adsbygoogle:not([data-adsbygoogle-status])");
     for (var i = 0; i < els.length; i++) {
