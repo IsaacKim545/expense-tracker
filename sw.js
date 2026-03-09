@@ -1,72 +1,66 @@
-const CACHE_NAME = "expense-tracker-v1";
-const STATIC_ASSETS = [
+var CACHE = "expense-tracker-v2";
+var STATIC = [
   "./manifest.json",
   "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./icons/icon-512.png"
 ];
 
-// Install: cache static assets only
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+self.addEventListener("install", function(e) {
+  e.waitUntil(caches.open(CACHE).then(function(c) { return c.addAll(STATIC); }));
   self.skipWaiting();
 });
 
-// Activate: clean old caches
-self.addEventListener("activate", (e) => {
+self.addEventListener("activate", function(e) {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.filter(function(k) { return k !== CACHE; }).map(function(k) { return caches.delete(k); }));
+    })
   );
   self.clients.claim();
 });
 
-// Fetch strategy
-self.addEventListener("fetch", (e) => {
+self.addEventListener("fetch", function(e) {
   if (e.request.method !== "GET") return;
 
-  const url = e.request.url;
+  var url = e.request.url;
 
-  // HTML: network-first (항상 최신 버전 우선, 오프라인이면 캐시)
-  if (e.request.destination === "document" || e.request.mode === "navigate") {
+  // HTML → network-first (항상 최신 버전, 오프라인이면 캐시)
+  if (e.request.mode === "navigate") {
     e.respondWith(
-      fetch(e.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match("./index.html"))
+      fetch(e.request).then(function(res) {
+        if (res.ok) {
+          var clone = res.clone();
+          caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
+        }
+        return res;
+      }).catch(function() {
+        return caches.match("./index.html");
+      })
     );
     return;
   }
 
-  // Google Fonts: cache-first (변하지 않으므로)
-  if (url.includes("fonts.googleapis.com") || url.includes("fonts.gstatic.com")) {
+  // Fonts → cache-first
+  if (url.indexOf("fonts.googleapis.com") !== -1 || url.indexOf("fonts.gstatic.com") !== -1) {
     e.respondWith(
-      caches.match(e.request).then((cached) => {
+      caches.match(e.request).then(function(cached) {
         if (cached) return cached;
-        return fetch(e.request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        return fetch(e.request).then(function(res) {
+          if (res.ok) {
+            var clone = res.clone();
+            caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
           }
-          return response;
+          return res;
         });
       })
     );
     return;
   }
 
-  // Other static assets: cache-first, fallback to network
+  // Other → cache-first
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(e.request).catch(() => {});
+    caches.match(e.request).then(function(cached) {
+      return cached || fetch(e.request);
     })
   );
 });
