@@ -250,6 +250,71 @@ input:focus { border-color: rgba(232,200,114,0.3) !important; outline: none; }
   transition: color 0.15s;
 }
 .tx-del:active { color: rgba(255,255,255,0.5); }
+.tx-edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,0.12);
+  font-size: 15px;
+  padding: 6px;
+  transition: color 0.15s;
+}
+.tx-edit:active { color: rgba(232,200,114,0.6); }
+.tx-editing { border-color: rgba(232,200,114,0.2) !important; background: rgba(232,200,114,0.03) !important; }
+
+/* Edit Panel */
+.edit-panel {
+  margin: 0 20px 14px;
+  padding: 18px;
+  background: rgba(232,200,114,0.04);
+  border: 1px solid rgba(232,200,114,0.12);
+  border-radius: 16px;
+  animation: fadeIn 0.2s ease;
+}
+.edit-panel h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8c872;
+  margin-bottom: 14px;
+}
+.edit-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.edit-row .f-input {
+  flex: 1;
+}
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.edit-save {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(232,200,114,0.15);
+  color: #e8c872;
+  transition: opacity 0.2s;
+}
+.edit-cancel {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+}
 
 /* ============================
    Add Form
@@ -563,6 +628,15 @@ var db = {
       tx.oncomplete = function() { conn.close(); resolve(); };
       tx.onerror = function() { conn.close(); reject(tx.error); };
     });
+  },
+  update: async function(item) {
+    var conn = await openDB();
+    return new Promise(function(resolve, reject) {
+      var tx = conn.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(item);
+      tx.oncomplete = function() { conn.close(); resolve(item); };
+      tx.onerror = function() { conn.close(); reject(tx.error); };
+    });
   }
 };
 
@@ -670,7 +744,9 @@ var S = {
   form: { type: "expense", cat: "food", amount: "", memo: "", date: todayStr() },
   flash: false,
   showInstall: false,
-  installDismissed: false
+  installDismissed: false,
+  editId: null,
+  editForm: { type: "expense", cat: "food", amount: "", memo: "", date: todayStr() }
 };
 
 // ════════════════════════════════════════
@@ -728,17 +804,19 @@ function monthNav() {
     '</div>';
 }
 
-function txRow(t, showDel) {
+function txRow(t, showActions) {
   var c = catOf(t.category);
   var isI = t.type === "income";
-  var html = '<div class="tx">' +
+  var isEditing = S.editId === t.id;
+  var html = '<div class="tx' + (isEditing ? ' tx-editing' : '') + '">' +
     '<div class="tx-icon" style="background:' + c.color + '15">' + c.icon + '</div>' +
     '<div class="tx-info">' +
       '<div class="tx-name">' + (t.memo || c.label) + '</div>' +
       '<div class="tx-meta">' + t.date.replace(/-/g, ".") + ' · ' + c.label + '</div>' +
     '</div>' +
     '<div class="tx-amt ' + (isI ? "i" : "e") + '">' + (isI ? "+" : "-") + fmt(t.amount) + '</div>';
-  if (showDel) {
+  if (showActions) {
+    html += '<button class="tx-edit" onclick="editTx(\'' + t.id + '\')">✎</button>';
     html += '<button class="tx-del" onclick="delTx(\'' + t.id + '\')">✕</button>';
   }
   html += '</div>';
@@ -882,6 +960,42 @@ function addView() {
     '</div>';
 }
 
+function editPanel() {
+  if (!S.editId) return "";
+  var f = S.editForm;
+  var cats = CATS[f.type];
+  var catBtns = "";
+  for (var i = 0; i < cats.length; i++) {
+    var c = cats[i];
+    var active = f.cat === c.id;
+    var style = active ? "border-color:" + c.color + "50;background:" + c.color + "12;color:" + c.color : "";
+    catBtns += '<button class="cat" style="' + style + '" onclick="setEF(\'cat\',\'' + c.id + '\')">' + c.icon + ' ' + c.label + '</button>';
+  }
+
+  return '<div class="edit-panel">' +
+    '<h3>거래 수정</h3>' +
+    '<div class="toggle" style="margin-bottom:12px">' +
+      '<button class="' + (f.type === "expense" ? "a-e" : "") + '" onclick="setEF(\'type\',\'expense\')">지출</button>' +
+      '<button class="' + (f.type === "income" ? "a-i" : "") + '" onclick="setEF(\'type\',\'income\')">수입</button>' +
+    '</div>' +
+    '<label class="f-label">금액</label>' +
+    '<div class="amt-wrap"><span class="pfx">₩</span>' +
+      '<input class="f-input" type="text" inputmode="numeric" placeholder="0" value="' + f.amount + '" oninput="handleEditAmt(this)">' +
+    '</div>' +
+    '<div class="edit-row">' +
+      '<input class="f-input" type="date" value="' + f.date + '" style="color-scheme:dark;" onchange="setEF(\'date\',this.value)">' +
+    '</div>' +
+    '<label class="f-label">카테고리</label>' +
+    '<div class="cats">' + catBtns + '</div>' +
+    '<label class="f-label">메모 (선택)</label>' +
+    '<input class="f-input" type="text" placeholder="내용을 입력하세요" value="' + f.memo + '" style="margin-bottom:4px;" oninput="setEFS(\'memo\',this.value)">' +
+    '<div class="edit-actions">' +
+      '<button class="edit-cancel" onclick="cancelEdit()">취소</button>' +
+      '<button class="edit-save" onclick="saveEdit()"' + (f.amount ? '' : ' disabled') + '>저장</button>' +
+    '</div>' +
+    '</div>';
+}
+
 function listView() {
   var txs = S.txs.filter(function(t) { return monthOf(t.date) === S.month; });
   txs.sort(function(a, b) { return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
@@ -918,7 +1032,7 @@ function listView() {
     }
   }
 
-  return monthNav() + adSlot() + content;
+  return monthNav() + editPanel() + adSlot() + content;
 }
 
 function statsView() {
@@ -998,6 +1112,7 @@ function statsView() {
 // ════════════════════════════════════════
 function setTab(t) {
   S.tab = t;
+  S.editId = null;
   render();
   window.scrollTo(0, 0);
 }
@@ -1053,6 +1168,75 @@ async function delTx(id) {
   try {
     await db.remove(id);
     S.txs = S.txs.filter(function(t) { return t.id !== id; });
+    if (S.editId === id) S.editId = null;
+    render();
+  } catch(e) {
+    showToast(e.message, "err");
+  }
+}
+
+function editTx(id) {
+  var tx = null;
+  for (var i = 0; i < S.txs.length; i++) {
+    if (S.txs[i].id === id) { tx = S.txs[i]; break; }
+  }
+  if (!tx) return;
+  S.editId = id;
+  S.editForm = {
+    type: tx.type,
+    cat: tx.category,
+    amount: tx.amount.toLocaleString(),
+    memo: tx.memo || "",
+    date: tx.date
+  };
+  render();
+}
+
+function cancelEdit() {
+  S.editId = null;
+  render();
+}
+
+function setEF(k, v) {
+  S.editForm[k] = v;
+  if (k === "type") S.editForm.cat = (v === "income") ? "salary" : "food";
+  render();
+}
+
+function setEFS(k, v) {
+  S.editForm[k] = v;
+}
+
+function handleEditAmt(el) {
+  var raw = el.value.replace(/[^0-9]/g, "");
+  S.editForm.amount = raw ? parseInt(raw, 10).toLocaleString() : "";
+  el.value = S.editForm.amount;
+  var btn = document.querySelector(".edit-save");
+  if (btn) btn.disabled = !S.editForm.amount;
+}
+
+async function saveEdit() {
+  var amt = parseInt(S.editForm.amount.replace(/[^0-9]/g, ""), 10);
+  if (!amt || amt <= 0) return;
+
+  var updated = null;
+  for (var i = 0; i < S.txs.length; i++) {
+    if (S.txs[i].id === S.editId) {
+      S.txs[i].type = S.editForm.type;
+      S.txs[i].category = S.editForm.cat;
+      S.txs[i].amount = amt;
+      S.txs[i].memo = S.editForm.memo.trim();
+      S.txs[i].date = S.editForm.date;
+      updated = S.txs[i];
+      break;
+    }
+  }
+
+  if (!updated) return;
+
+  try {
+    await db.update(updated);
+    S.editId = null;
     render();
   } catch(e) {
     showToast(e.message, "err");
